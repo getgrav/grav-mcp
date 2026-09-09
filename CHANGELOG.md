@@ -3,8 +3,10 @@
 
 1. [](#new)
     * Plugins can now publish their own tools. Any enabled plugin that ships an `mcp.yaml` manifest describing its API routes shows up as tools named `<plugin>_<name>`, with the plugin's own permissions checked before each call, and nothing to configure on this end. `refresh_plugin_tools` re-reads the manifests without a restart, so a plugin you install or enable mid-session becomes usable right away, and `discover_plugins` reports which plugins offer tools. Load only some plugins with `--plugin-tools slug,slug`, or turn the whole thing off with `--plugin-tools none` (or `GRAV_MCP_PLUGIN_TOOLS`). Sites running an older API plugin are unaffected: the server warns on stderr and starts with core tools only
+    * A plugin manifest can now mark one argument as the whole request body (`body`, manifest version 2), so plugins whose fields come from site blueprints rather than the manifest, such as a Flex directory's fields, can be driven from a tool [getgrav/grav-plugin-api#32](https://github.com/getgrav/grav-plugin-api/issues/32)
 
 1. [](#bugfix)
+    * A plugin tool whose manifest sets `additionalProperties: true` on its root schema now passes undeclared arguments through instead of silently stripping them, and advertises that it accepts them [#4](https://github.com/getgrav/grav-mcp/issues/4)
     * Error responses are now read even though the API sends them as `application/problem+json`, so a failed call reports the server's own detail (`Product not found`, a conflict message) instead of a bare `HTTP 404: Not Found`
     * A `409` from a plugin route now reports the plugin's own reason (an attribute still in use, a slug already taken) instead of being mistaken for an ETag conflict and told to refetch
     * A `404` whose body is a plugin's own `data` envelope now reports its `message` (`No license matches that key.`) rather than the generic `Resource not found.`

@@ -419,6 +419,8 @@ export interface McpToolDefinition {
   input_schema?: JsonSchemaNode | null;
   path_params?: string[];
   query?: string[];
+  /** Names the single argument whose object value is the whole JSON body. */
+  body?: string | null;
 }
 
 export interface McpPluginSummary {

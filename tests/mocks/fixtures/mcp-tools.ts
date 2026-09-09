@@ -229,3 +229,99 @@ export const unsupportedSchemaToolsResponse = {
   warnings: [],
   fingerprint: '5f1d0004',
 };
+
+// Manifest version 2 ground: a root `additionalProperties` (true and false) and
+// the `body` designation that names the argument carrying the whole JSON body.
+export const rootAndBodyToolsResponse = {
+  tools: [
+    {
+      name: 'widgets_replace_thing',
+      plugin: 'widgets',
+      title: 'Replace a thing',
+      description: 'Replace a thing with whatever fields the site defines.',
+      method: 'PUT',
+      path: '/things/{id}',
+      annotations: { readOnly: false, destructive: false, idempotent: true },
+      input_schema: {
+        type: 'object',
+        required: ['id'],
+        additionalProperties: true,
+        properties: {
+          id: { type: 'string' },
+          dry_run: { type: 'boolean', description: 'Validate without saving' },
+        },
+      },
+      path_params: ['id'],
+      query: ['dry_run'],
+    },
+    {
+      name: 'widgets_create_thing',
+      plugin: 'widgets',
+      title: 'Create a thing',
+      description: 'Create a thing from the declared fields only.',
+      method: 'POST',
+      path: '/things',
+      annotations: { readOnly: false, destructive: false, idempotent: false },
+      input_schema: {
+        type: 'object',
+        required: ['title'],
+        additionalProperties: false,
+        properties: { title: { type: 'string' } },
+      },
+      path_params: [],
+      query: [],
+    },
+    {
+      name: 'flex_update_object',
+      plugin: 'flex-objects',
+      title: 'Update a Flex object',
+      description: 'Update one Flex object; `object` holds the blueprint fields.',
+      method: 'PATCH',
+      path: '/flex-objects/{type}/{key}',
+      annotations: { readOnly: false, destructive: false, idempotent: true },
+      input_schema: {
+        type: 'object',
+        required: ['type', 'key', 'object'],
+        properties: {
+          type: { type: 'string' },
+          key: { type: 'string' },
+          lang: { type: 'string' },
+          object: {
+            type: 'object',
+            additionalProperties: true,
+            description: 'Fields per the directory blueprint',
+          },
+        },
+      },
+      path_params: ['type', 'key'],
+      query: ['lang'],
+      body: 'object',
+    },
+    {
+      name: 'flex_create_object',
+      plugin: 'flex-objects',
+      title: 'Create a Flex object',
+      description: 'Create a Flex object in a directory.',
+      method: 'POST',
+      path: '/flex-objects/{type}',
+      annotations: { readOnly: false, destructive: false, idempotent: false },
+      input_schema: {
+        type: 'object',
+        required: ['type'],
+        properties: {
+          type: { type: 'string' },
+          object: { type: 'object', additionalProperties: true },
+        },
+      },
+      path_params: ['type'],
+      query: [],
+      body: 'object',
+    },
+  ],
+  plugins: [
+    { slug: 'widgets', name: 'Widgets', version: '1.0.0', tools: 2 },
+    { slug: 'flex-objects', name: 'Flex Objects', version: '1.0.0', tools: 2 },
+  ],
+  warnings: [],
+  fingerprint: '5f1d0005',
+};

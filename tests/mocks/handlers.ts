@@ -397,6 +397,14 @@ export const handlers = [
   http.delete(`${BASE}/kahunacart/attributes/:id`, async ({ request }) =>
     jsonResponse(await echoRequest(request)),
   ),
+  http.put(`${BASE}/things/:id`, async ({ request }) => jsonResponse(await echoRequest(request))),
+  http.post(`${BASE}/things`, async ({ request }) => jsonResponse(await echoRequest(request))),
+  http.patch(`${BASE}/flex-objects/:type/:key`, async ({ request }) =>
+    jsonResponse(await echoRequest(request)),
+  ),
+  http.post(`${BASE}/flex-objects/:type`, async ({ request }) =>
+    jsonResponse(await echoRequest(request)),
+  ),
 ];
 
 async function echoRequest(request: Request) {

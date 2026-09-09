@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { jsonSchemaToZodShape, JsonSchemaSubsetError } from '../../../src/client/json-schema.js';
+import {
+  jsonSchemaToZodShape,
+  jsonSchemaToZodObject,
+  JsonSchemaSubsetError,
+} from '../../../src/client/json-schema.js';
 
 function shapeOf(properties: Record<string, unknown>, required?: string[]) {
   return jsonSchemaToZodShape({
@@ -255,5 +259,37 @@ describe('jsonSchemaToZodShape', () => {
         /'patternProperties' at input/,
       );
     });
+  });
+});
+
+describe('jsonSchemaToZodObject', () => {
+  it('is a ZodObject even for a schema with no properties', () => {
+    expect(jsonSchemaToZodObject(undefined)).toBeInstanceOf(z.ZodObject);
+    expect(jsonSchemaToZodObject({ type: 'object', properties: {} })).toBeInstanceOf(z.ZodObject);
+  });
+
+  it('passes unknown keys through when the root allows them', () => {
+    const schema = jsonSchemaToZodObject({
+      type: 'object',
+      additionalProperties: true,
+      properties: { q: { type: 'string' } },
+    });
+    const result = schema.safeParse({ q: 'x', extra: 1 });
+    expect(result.success && result.data).toEqual({ q: 'x', extra: 1 });
+  });
+
+  it('rejects unknown keys when the root forbids them', () => {
+    const schema = jsonSchemaToZodObject({
+      type: 'object',
+      additionalProperties: false,
+      properties: { q: { type: 'string' } },
+    });
+    expect(schema.safeParse({ q: 'x', extra: 1 }).success).toBe(false);
+  });
+
+  it('strips unknown keys when the root says nothing', () => {
+    const schema = jsonSchemaToZodObject({ type: 'object', properties: { q: { type: 'string' } } });
+    const result = schema.safeParse({ q: 'x', extra: 1 });
+    expect(result.success && result.data).toEqual({ q: 'x' });
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
+import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { GravClient } from '../../../src/client/grav-client.js';
 import { mockServer } from '../../mocks/handlers.js';
@@ -20,6 +21,7 @@ import {
   changedMcpToolsResponse,
   collidingMcpToolsResponse,
   unsupportedSchemaToolsResponse,
+  rootAndBodyToolsResponse,
 } from '../../mocks/fixtures/mcp-tools.js';
 
 const BASE = '*/v1';
@@ -266,6 +268,118 @@ describe('Plugin-published tools', () => {
       const schema = h.tool('kahunacart_get_product').inputSchema as any;
       expect(schema.safeParse({ lang: 'en' }).success).toBe(false);
       expect(schema.safeParse({ id: 5 }).success).toBe(true);
+    });
+  });
+
+  describe('root additionalProperties', () => {
+    it('keeps undeclared arguments and sends them when the root allows them', async () => {
+      serveTools(rootAndBodyToolsResponse);
+      const h = boot();
+      await loadPluginTools(h.server);
+
+      const schema = h.tool('widgets_replace_thing').inputSchema as any;
+      const parsed = schema.safeParse({ id: '1', color: 'red', dry_run: true });
+      expect(parsed.success).toBe(true);
+      expect(parsed.data.color).toBe('red');
+
+      const data = dataOf(await h.call('widgets_replace_thing', parsed.data));
+      expect(data.path).toBe('/api/v1/things/1');
+      expect(data.query).toEqual({ dry_run: 'true' });
+      expect(data.body).toEqual({ color: 'red' });
+    });
+
+    it('advertises the root as passthrough, so a model knows it may add fields', async () => {
+      serveTools(rootAndBodyToolsResponse);
+      const h = boot();
+      await loadPluginTools(h.server);
+
+      const schema = h.tool('widgets_replace_thing').inputSchema as any;
+      expect(schema instanceof z.ZodObject).toBe(true);
+      expect(schema._def.unknownKeys).toBe('passthrough');
+    });
+
+    it('rejects undeclared arguments when the root forbids them', async () => {
+      serveTools(rootAndBodyToolsResponse);
+      const h = boot();
+      await loadPluginTools(h.server);
+
+      const schema = h.tool('widgets_create_thing').inputSchema as any;
+      expect(schema.safeParse({ title: 'A', color: 'red' }).success).toBe(false);
+      expect(schema.safeParse({ title: 'A' }).success).toBe(true);
+    });
+
+    it('strips undeclared arguments when the root says nothing', async () => {
+      const h = boot();
+      await loadPluginTools(h.server);
+
+      const schema = h.tool('kahunacart_list_products').inputSchema as any;
+      const parsed = schema.safeParse({ q: 'shirt', color: 'red' });
+      expect(parsed.success).toBe(true);
+      expect(parsed.data).toEqual({ q: 'shirt' });
+    });
+
+    it('keeps the root passthrough after a refresh', async () => {
+      serveTools(rootAndBodyToolsResponse);
+      const h = boot();
+      await loadPluginTools(h.server);
+
+      serveTools({
+        ...rootAndBodyToolsResponse,
+        tools: [
+          { ...rootAndBodyToolsResponse.tools[0], description: 'Replace a thing. Now with more fields.' },
+          ...rootAndBodyToolsResponse.tools.slice(1),
+        ],
+      });
+      const data = dataOf(await h.call('refresh_plugin_tools'));
+      expect(data.updated).toEqual(['widgets_replace_thing']);
+
+      const schema = h.tool('widgets_replace_thing').inputSchema as any;
+      expect(schema._def.unknownKeys).toBe('passthrough');
+      expect(schema.safeParse({ id: '1', color: 'red' }).data.color).toBe('red');
+    });
+  });
+
+  describe('body designation', () => {
+    it('sends the designated argument as the whole body', async () => {
+      serveTools(rootAndBodyToolsResponse);
+      const h = boot();
+      await loadPluginTools(h.server);
+
+      const data = dataOf(
+        await h.call('flex_update_object', {
+          type: 'contacts',
+          key: 'abc',
+          lang: 'en',
+          object: { title: 'T', type: 'shadowed' },
+        }),
+      );
+      expect(data.method).toBe('PATCH');
+      expect(data.path).toBe('/api/v1/flex-objects/contacts/abc');
+      expect(data.query).toEqual({ lang: 'en' });
+      expect(data.body).toEqual({ title: 'T', type: 'shadowed' });
+    });
+
+    it('sends no body when the designated argument is missing', async () => {
+      serveTools(rootAndBodyToolsResponse);
+      const h = boot();
+      await loadPluginTools(h.server);
+
+      const data = dataOf(await h.call('flex_create_object', { type: 'contacts' }));
+      expect(data.method).toBe('POST');
+      expect(data.path).toBe('/api/v1/flex-objects/contacts');
+      expect(data.body).toBeNull();
+    });
+
+    it('rejects a designated body argument that is not an object', async () => {
+      serveTools(rootAndBodyToolsResponse);
+      const h = boot();
+      await loadPluginTools(h.server);
+
+      const result = await h.call('flex_update_object', { type: 'contacts', key: 'abc', object: '{"title":"T"}' });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(
+        /The 'object' argument of flex_update_object is the request body and must be an object\./,
+      );
     });
   });
 

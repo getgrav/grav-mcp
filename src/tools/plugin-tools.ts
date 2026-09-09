@@ -3,7 +3,7 @@ import type { ZodRawShape } from 'zod';
 import type { McpServer, RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { GravClient } from '../client/grav-client.js';
 import { GravApiError } from '../client/error-mapper.js';
-import { jsonSchemaToZodShape } from '../client/json-schema.js';
+import { jsonSchemaToZodObject } from '../client/json-schema.js';
 import type {
   McpPluginSummary,
   McpToolAnnotations,
@@ -131,12 +131,15 @@ export function registerPluginTools(
       if (fingerprintOf(existing.definition) === fingerprintOf(definition)) continue;
 
       try {
-        const shape = buildInputShape(definition);
+        const schema = buildInputSchema(definition);
         existing.definition = definition;
+        // `update({ paramsSchema })` runs its argument through the SDK's
+        // `objectFromShape`, which would drop the root's passthrough/strict, so
+        // set the schema directly and update the rest.
+        existing.tool.inputSchema = schema;
         existing.tool.update({
           title: definition.title,
           description: composeDescription(definition),
-          paramsSchema: shape,
           annotations: toolAnnotations(definition),
         });
         updated.push(name);
@@ -209,13 +212,13 @@ function registerOne(
   registry: Map<string, RegistryEntry>,
   definition: McpToolDefinition,
 ): void {
-  const shape = buildInputShape(definition);
+  const schema = buildInputSchema(definition);
   const entry = { definition } as RegistryEntry;
 
   entry.tool = server.registerTool(definition.name, {
     title: definition.title,
     description: composeDescription(definition),
-    inputSchema: shape,
+    inputSchema: schema,
     annotations: toolAnnotations(definition),
   }, async (args: Record<string, unknown>) => handleToolCall(ensureInit, async () => {
     const def = entry.definition;
@@ -259,7 +262,11 @@ function substitutePath(definition: McpToolDefinition, values: Record<string, un
  * GET sends every remaining argument as a query parameter. Every other method
  * sends the arguments named in `query` as query parameters and the rest as the
  * JSON body, so a DELETE with no `query` list puts everything in the body.
- * Undefined arguments are dropped.
+ * A tool that names a `body` argument sends that argument's object as the whole
+ * body instead, so a plugin can take fields it cannot declare (a Flex object's
+ * blueprint fields, say). Leaving that argument out sends no body; passing it
+ * as anything but an object (a JSON string, typically) is an error rather than
+ * a silently empty body. Undefined arguments are dropped.
  */
 function splitArguments(
   definition: McpToolDefinition,
@@ -272,14 +279,28 @@ function splitArguments(
   const body: Record<string, unknown> = {};
   const queryNames = new Set(definition.query ?? []);
   const allQuery = definition.method === 'GET';
+  const bodyName = !allQuery && definition.body ? definition.body : undefined;
 
   for (const [key, value] of Object.entries(values)) {
     if (value === undefined) continue;
     if (allQuery || queryNames.has(key)) {
       query[key] = toQueryValue(value);
-    } else {
+    } else if (bodyName === undefined) {
       body[key] = value;
     }
+  }
+
+  if (bodyName !== undefined) {
+    const designated = values[bodyName];
+    if (designated === undefined) return { query, body: undefined };
+    if (typeof designated !== 'object' || designated === null || Array.isArray(designated)) {
+      throw new GravApiError(
+        `The '${bodyName}' argument of ${definition.name} is the request body and must be an object.`,
+        400,
+        false,
+      );
+    }
+    return { query, body: designated as Record<string, unknown> };
   }
 
   return { query, body: Object.keys(body).length ? body : undefined };
@@ -298,20 +319,22 @@ function pathParams(definition: McpToolDefinition): string[] {
   return [...definition.path.matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
 }
 
-function buildInputShape(definition: McpToolDefinition): ZodRawShape {
-  const shape = jsonSchemaToZodShape(definition.input_schema);
+function buildInputSchema(definition: McpToolDefinition): z.ZodObject<any> {
+  const schema = jsonSchemaToZodObject(definition.input_schema);
+  const required: ZodRawShape = {};
 
   // Path placeholders are always required, whatever the manifest's `required` says.
   for (const param of pathParams(definition)) {
-    const entry = shape[param];
+    const entry = schema.shape[param];
     if (entry === undefined) {
-      shape[param] = z.string().describe(`Fills the {${param}} placeholder in ${definition.path}`);
+      required[param] = z.string().describe(`Fills the {${param}} placeholder in ${definition.path}`);
     } else if (entry instanceof z.ZodOptional) {
-      shape[param] = entry.unwrap();
+      required[param] = entry.unwrap();
     }
   }
 
-  return shape;
+  // `extend` keeps the root's passthrough/strict setting.
+  return Object.keys(required).length ? schema.extend(required) : schema;
 }
 
 /** Matches the core tools' wording, and names the plugin the tool came from. */
@@ -365,6 +388,7 @@ function fingerprintOf(definition: McpToolDefinition): string {
     definition.input_schema ?? null,
     definition.path_params ?? null,
     definition.query ?? null,
+    definition.body ?? null,
   ]);
 }
 

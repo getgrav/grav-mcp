@@ -100,6 +100,28 @@ export function jsonSchemaToZodShape(schema?: JsonSchemaNode | null): ZodRawShap
   return objectShape(schema, '');
 }
 
+/**
+ * Converts a top-level `type: object` schema into the zod object to hand to
+ * `McpServer.registerTool({ inputSchema })`. The root's `additionalProperties`
+ * is honoured exactly the way a nested object's is: `true` passes undeclared
+ * arguments through, `false` rejects them, unset strips them (zod's default).
+ * The result is always a `ZodObject`, even with no properties, because that is
+ * what the SDK advertises as the tool's JSON Schema.
+ */
+export function jsonSchemaToZodObject(schema?: JsonSchemaNode | null): z.ZodObject<any> {
+  const object = z.object(jsonSchemaToZodShape(schema));
+  const additional = schema?.additionalProperties;
+
+  if (additional === undefined) return object;
+  if (additional === false) return object.strict();
+  if (additional === true) return object.passthrough();
+  if (isPlainObject(additional)) {
+    return object.catchall(convertProperty(additional, 'additionalProperties', true));
+  }
+
+  fail("'additionalProperties' must be a boolean or a schema", '');
+}
+
 function objectShape(node: JsonSchemaNode, path: string): ZodRawShape {
   const properties = node.properties ?? {};
   if (!isPlainObject(properties)) fail("'properties' must be an object", path);
