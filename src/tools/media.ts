@@ -116,8 +116,7 @@ export function registerMediaTools(
       contentType: f.content_type || guessMimeType(f.filename),
     }));
     const query = buildQuery({ path: args.path });
-    // Upload to /media with optional path query param
-    const response = await client.uploadFile<unknown>('/media', files);
+    const response = await client.uploadFile<unknown>('/media', files, { query });
     return toolResult(response.data);
   }));
 

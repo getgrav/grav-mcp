@@ -6,6 +6,7 @@
     * A plugin manifest can now mark one argument as the whole request body (`body`, manifest version 2), so plugins whose fields come from site blueprints rather than the manifest, such as a Flex directory's fields, can be driven from a tool [getgrav/grav-plugin-api#32](https://github.com/getgrav/grav-plugin-api/issues/32)
 
 1. [](#bugfix)
+    * `upload_site_media` now uploads into the subfolder given in `path` instead of always using the media root [#8](https://github.com/getgrav/grav-mcp/issues/8)
     * A plugin tool whose manifest sets `additionalProperties: true` on its root schema now passes undeclared arguments through instead of silently stripping them, and advertises that it accepts them [#4](https://github.com/getgrav/grav-mcp/issues/4)
     * Error responses are now read even though the API sends them as `application/problem+json`, so a failed call reports the server's own detail (`Product not found`, a conflict message) instead of a bare `HTTP 404: Not Found`
     * A `409` from a plugin route now reports the plugin's own reason (an attribute still in use, a slug already taken) instead of being mistaken for an ETag conflict and told to refetch

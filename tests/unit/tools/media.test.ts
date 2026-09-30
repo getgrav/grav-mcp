@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { mockServer } from '../../mocks/handlers.js';
 import { GravClient } from '../../../src/client/grav-client.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerMediaTools } from '../../../src/tools/media.js';
@@ -62,6 +64,27 @@ describe('Media Tools', () => {
     it('returns paginated site media', async () => {
       const result = await callTool('list_site_media');
       expect(result.isError).toBeUndefined();
+    });
+  });
+
+  describe('upload_site_media', () => {
+    it('sends the subfolder as the path query parameter', async () => {
+      let requestUrl = '';
+      mockServer.use(
+        http.post('http://test.local/api/v1/media', ({ request }) => {
+          requestUrl = request.url;
+          return HttpResponse.json({ data: [{ filename: 'photo.jpg', type: 'image' }] });
+        }),
+      );
+      const result = await callTool('upload_site_media', {
+        path: 'images/2024',
+        files: [{
+          filename: 'photo.jpg',
+          content_base64: Buffer.from('fake-image-data').toString('base64'),
+        }],
+      });
+      expect(result.isError).toBeUndefined();
+      expect(new URL(requestUrl).searchParams.get('path')).toBe('images/2024');
     });
   });
 
