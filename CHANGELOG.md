@@ -1,5 +1,5 @@
 # v0.1.2
-## 08/28/2026
+## 09/30/2026
 
 1. [](#new)
     * Plugins can now publish their own tools. Any enabled plugin that ships an `mcp.yaml` manifest describing its API routes shows up as tools named `<plugin>_<name>`, with the plugin's own permissions checked before each call, and nothing to configure on this end. `refresh_plugin_tools` re-reads the manifests without a restart, so a plugin you install or enable mid-session becomes usable right away, and `discover_plugins` reports which plugins offer tools. Load only some plugins with `--plugin-tools slug,slug`, or turn the whole thing off with `--plugin-tools none` (or `GRAV_MCP_PLUGIN_TOOLS`). Sites running an older API plugin are unaffected: the server warns on stderr and starts with core tools only
