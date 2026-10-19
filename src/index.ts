@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createServer } from './server.js';
+import { CORE_TOOL_GROUPS, createServer, type CoreToolsMode } from './server.js';
 import { GravApiError } from './client/error-mapper.js';
 import { loadPluginTools, type PluginToolsMode } from './tools/plugin-tools.js';
 
@@ -12,6 +12,7 @@ interface CliConfig {
   transport: 'stdio' | 'http';
   port: number;
   pluginTools: PluginToolsMode;
+  coreTools: CoreToolsMode;
 }
 
 // Startup must not hang on an unreachable site: past this, the server starts
@@ -36,6 +37,8 @@ function parseArgs(): CliConfig {
       parsed.port = args[++i];
     } else if (arg === '--plugin-tools' && args[i + 1]) {
       parsed.pluginTools = args[++i];
+    } else if (arg === '--core-tools' && args[i + 1]) {
+      parsed.coreTools = args[++i];
     } else if (arg === '--help' || arg === '-h') {
       printUsage();
       process.exit(0);
@@ -53,6 +56,9 @@ function parseArgs(): CliConfig {
   const pluginTools = parsePluginTools(
     parsed.pluginTools || process.env.GRAV_MCP_PLUGIN_TOOLS || 'all',
   );
+  const coreTools = parseCoreTools(
+    parsed.coreTools || process.env.GRAV_MCP_CORE_TOOLS || 'all',
+  );
 
   if (!url) {
     console.error('Error: GRAV_API_URL is required. Set via --url or GRAV_API_URL environment variable.');
@@ -69,7 +75,7 @@ function parseArgs(): CliConfig {
     process.exit(1);
   }
 
-  return { url, apiKey, environment, transport, port, pluginTools };
+  return { url, apiKey, environment, transport, port, pluginTools, coreTools };
 }
 
 function parsePluginTools(value: string): PluginToolsMode {
@@ -85,6 +91,22 @@ function parsePluginTools(value: string): PluginToolsMode {
     process.exit(1);
   }
   return slugs;
+}
+
+function parseCoreTools(value: string): CoreToolsMode {
+  const trimmed = value.trim();
+  if (trimmed === '' || trimmed === 'all') return 'all';
+  if (trimmed === 'none') return 'none';
+
+  const groups = trimmed.split(',').map((s) => s.trim()).filter(Boolean);
+  const unknown = groups.filter((g) => !(g in CORE_TOOL_GROUPS));
+  if (!groups.length || unknown.length) {
+    console.error(
+      `Error: Invalid --core-tools value "${value}". Use "all", "none", or a comma-separated list of: ${Object.keys(CORE_TOOL_GROUPS).join(', ')}.`,
+    );
+    process.exit(1);
+  }
+  return groups;
 }
 
 function printUsage(): void {
@@ -103,6 +125,10 @@ Options:
   --plugin-tools <mode> Tools published by plugins: all (default), none, or a
                         comma-separated list of plugin slugs
                         (or GRAV_MCP_PLUGIN_TOOLS env var)
+  --core-tools <mode>   Core tool groups: all (default), none, or a
+                        comma-separated list of pages, multilingual, media,
+                        config, users, gpm, system, webhooks, blueprints,
+                        plugins (or GRAV_MCP_CORE_TOOLS env var)
   -h, --help            Show this help
   -v, --version         Show version
 
@@ -162,6 +188,7 @@ async function main(): Promise<void> {
     apiKey: config.apiKey,
     environment: config.environment,
     pluginTools: config.pluginTools,
+    coreTools: config.coreTools,
   });
 
   if (config.pluginTools !== 'none') {

@@ -22,7 +22,27 @@ export interface ServerConfig {
   environment?: string;
   /** Which plugin-published tools to load: 'all' (default), 'none', or a list of plugin slugs. */
   pluginTools?: PluginToolsMode;
+  /** Which core tool groups to load: 'all' (default), 'none', or a list of group names. */
+  coreTools?: CoreToolsMode;
 }
+
+type ToolGroupRegistrar = (server: McpServer, client: GravClient, ensureInit: () => Promise<void>) => void;
+
+/** The core tool groups, by the name `--core-tools` takes. */
+export const CORE_TOOL_GROUPS: Record<string, ToolGroupRegistrar> = {
+  pages: registerPageTools,
+  multilingual: registerMultilingualTools,
+  media: registerMediaTools,
+  config: registerConfigTools,
+  users: registerUserTools,
+  gpm: registerGpmTools,
+  system: registerSystemTools,
+  webhooks: registerWebhookTools,
+  blueprints: registerBlueprintTools,
+  plugins: registerPluginDiscoveryTools,
+};
+
+export type CoreToolsMode = 'all' | 'none' | string[];
 
 export function createServer(config: ServerConfig): McpServer {
   const client = new GravClient({
@@ -60,17 +80,13 @@ export function createServer(config: ServerConfig): McpServer {
     }
   };
 
-  // Register all tool groups
-  registerPageTools(server, client, ensureInitialized);
-  registerMultilingualTools(server, client, ensureInitialized);
-  registerMediaTools(server, client, ensureInitialized);
-  registerConfigTools(server, client, ensureInitialized);
-  registerUserTools(server, client, ensureInitialized);
-  registerGpmTools(server, client, ensureInitialized);
-  registerSystemTools(server, client, ensureInitialized);
-  registerWebhookTools(server, client, ensureInitialized);
-  registerBlueprintTools(server, client, ensureInitialized);
-  registerPluginDiscoveryTools(server, client, ensureInitialized);
+  // Register the core tool groups asked for (all of them by default)
+  const coreTools = config.coreTools ?? 'all';
+  for (const [group, register] of Object.entries(CORE_TOOL_GROUPS)) {
+    if (coreTools === 'all' || (coreTools !== 'none' && coreTools.includes(group))) {
+      register(server, client, ensureInitialized);
+    }
+  }
 
   // Tools published by plugins via mcp.yaml. This only registers the core
   // refresh_plugin_tools tool; the plugin tools themselves arrive when

@@ -1,3 +1,9 @@
+# v0.1.3
+## 10/19/2026
+
+1. [](#new)
+    * Core tools can now be turned off by group with `--core-tools` (or `GRAV_MCP_CORE_TOOLS`): `all` (default), `none`, or a list such as `pages,media`. `--core-tools none --plugin-tools kahunacart` gives an assistant only the store tools, so a site with hundreds of plugin tools doesn't fill its context with Grav tools it won't use. `refresh_plugin_tools` always stays
+
 # v0.1.2
 ## 09/30/2026
 

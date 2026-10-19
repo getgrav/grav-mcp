@@ -52,6 +52,7 @@ npx grav-mcp --url https://mysite.com/api --key grav_abc123 --transport http --p
 | `GRAV_API_KEY` | `--key` | Yes | API key (starts with `grav_`) |
 | `GRAV_ENVIRONMENT` | `--environment` | No | Multi-environment override |
 | `GRAV_MCP_PLUGIN_TOOLS` | `--plugin-tools` | No | Which plugin-published tools to load: `all` (default), `none`, or a comma-separated list of plugin slugs |
+| `GRAV_MCP_CORE_TOOLS` | `--core-tools` | No | Which core tool groups to load: `all` (default), `none`, or a comma-separated list of `pages`, `multilingual`, `media`, `config`, `users`, `gpm`, `system`, `webhooks`, `blueprints`, `plugins`. `--core-tools none --plugin-tools kahunacart` gives an assistant only the store tools, which keeps its tool list (and context) small. `refresh_plugin_tools` is always loaded |
 
 ## Tools Reference
 
