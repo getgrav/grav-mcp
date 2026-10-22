@@ -1,3 +1,9 @@
+# v0.1.4
+## 10/22/2026
+
+1. [](#bugfix)
+    * `update_page` now updates the language given in `lang`. It was sent where the API doesn't read it, so the change went to the default language, or failed on a page that only exists in another language. Thanks @renedebaaij
+
 # v0.1.3
 ## 10/19/2026
 

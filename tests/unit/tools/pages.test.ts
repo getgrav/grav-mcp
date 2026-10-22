@@ -118,6 +118,18 @@ describe('Page Tools', () => {
       expect(result.isError).toBeUndefined();
     });
 
+    it('sends lang as a query parameter, not in the body', async () => {
+      const result = await callTool('update_page', {
+        route: '/blog/hello-world',
+        title: 'Updated',
+        lang: 'en',
+      }) as any;
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0].text);
+      expect(data._query_lang).toBe('en');
+      expect(data.lang).toBeUndefined();
+    });
+
     it('returns error on stale ETag', async () => {
       const result = await callTool('update_page', {
         route: '/blog/hello-world',

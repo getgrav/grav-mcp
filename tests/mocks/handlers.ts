@@ -74,8 +74,9 @@ export const handlers = [
       return errorResponse(409, 'Conflict', 'Resource was modified');
     }
     const body = await request.json() as Record<string, unknown>;
+    const lang = new URL(request.url).searchParams.get('lang');
     return jsonResponse(
-      { ...pageFixtures.singlePage, ...body },
+      { ...pageFixtures.singlePage, ...body, ...(lang ? { _query_lang: lang } : {}) },
       undefined,
       { ETag: '"etag-updated"' },
     );

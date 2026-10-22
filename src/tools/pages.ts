@@ -143,9 +143,12 @@ export function registerPageTools(
     if (args.header !== undefined) body.header = args.header;
     if (args.published !== undefined) body.published = args.published;
     if (args.visible !== undefined) body.visible = args.visible;
-    if (args.lang !== undefined) body.lang = args.lang;
 
-    const response = await client.patch<Page>(`/pages/${route}`, body, { etag: args.etag });
+    // The API reads the language to update from the query string, not the body
+    const response = await client.patch<Page>(`/pages/${route}`, body, {
+      etag: args.etag,
+      query: buildQuery({ lang: args.lang }),
+    });
     const result: Record<string, unknown> = { ...response.data };
     if (response.etag) result._etag = response.etag;
     return toolResult(result);
