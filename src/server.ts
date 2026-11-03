@@ -15,6 +15,7 @@ import { registerPluginTools as registerPluginDiscoveryTools } from './tools/plu
 import { registerPluginTools, type PluginToolsMode } from './tools/plugin-tools.js';
 import { registerResources } from './resources/index.js';
 import { registerPrompts } from './prompts/index.js';
+import type { McpToolDefinition } from './types/grav-api.js';
 
 export interface ServerConfig {
   url: string;
@@ -24,6 +25,7 @@ export interface ServerConfig {
   pluginTools?: PluginToolsMode;
   /** Which core tool groups to load: 'all' (default), 'none', or a list of group names. */
   coreTools?: CoreToolsMode;
+  initialPluginTools?: McpToolDefinition[];
 }
 
 type ToolGroupRegistrar = (server: McpServer, client: GravClient, ensureInit: () => Promise<void>) => void;
@@ -88,10 +90,10 @@ export function createServer(config: ServerConfig): McpServer {
     }
   }
 
-  // Tools published by plugins via mcp.yaml. This only registers the core
-  // refresh_plugin_tools tool; the plugin tools themselves arrive when
-  // loadPluginTools(server) runs, before the transport connects.
-  registerPluginTools(server, client, ensureInitialized, { mode: config.pluginTools ?? 'all' });
+  registerPluginTools(server, client, ensureInitialized, {
+    mode: config.pluginTools ?? 'all',
+    initialTools: config.initialPluginTools,
+  });
 
   // Register resources and prompts
   registerResources(server, client, ensureInitialized);

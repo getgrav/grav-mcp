@@ -28,6 +28,7 @@ export type PluginToolsMode = 'all' | 'none' | string[];
 
 export interface PluginToolsOptions {
   mode?: PluginToolsMode;
+  initialTools?: McpToolDefinition[];
 }
 
 export interface PluginToolsSyncResult {
@@ -53,6 +54,10 @@ interface RegistryEntry {
 // Last successfully loaded set, grouped for `discover_plugins` so a model can
 // see which plugins offer tools without a second fetch.
 let lastLoadedTools: McpToolDefinition[] = [];
+
+export function getPluginToolDefinitions(): McpToolDefinition[] {
+  return [...lastLoadedTools];
+}
 
 export function getPluginToolSummaries(): Array<{ plugin: string; tools: string[] }> {
   const byPlugin = new Map<string, string[]>();
@@ -91,6 +96,20 @@ export function registerPluginTools(
 ): PluginToolsController {
   const mode: PluginToolsMode = options.mode ?? 'all';
   const registry = new Map<string, RegistryEntry>();
+
+  for (const definition of options.initialTools ?? []) {
+    if (!includesPlugin(mode, definition.plugin)) continue;
+    if (isNameTaken(server, definition.name)) {
+      warn([], `Skipped plugin tool '${definition.name}' (${definition.plugin}): a tool with that name is already registered.`);
+      continue;
+    }
+    try {
+      registerOne(server, client, ensureInit, registry, definition);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      warn([], `Skipped plugin tool '${definition.name}' (${definition.plugin}): ${message}`);
+    }
+  }
 
   async function sync(): Promise<PluginToolsSyncResult> {
     // @api GET /mcp/tools
