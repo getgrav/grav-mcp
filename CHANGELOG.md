@@ -1,3 +1,9 @@
+# v0.1.5
+## 11/03/2026
+
+1. [](#bugfix)
+    * The HTTP transport (`--transport http`) no longer crashes on the second request. It reused one server for every request, so the next connect threw `Already connected to a transport` and ended the process. Each request now gets its own server, closed when the response ends, and a failure returns a JSON-RPC error instead of stopping the process [#9](https://github.com/getgrav/grav-mcp/pull/9). Thanks @piotrtrz
+
 # v0.1.4
 ## 10/22/2026
 

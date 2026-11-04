@@ -25,6 +25,7 @@ export interface ServerConfig {
   pluginTools?: PluginToolsMode;
   /** Which core tool groups to load: 'all' (default), 'none', or a list of group names. */
   coreTools?: CoreToolsMode;
+  /** Plugin tool definitions already loaded elsewhere, registered up front with no manifest fetch. */
   initialPluginTools?: McpToolDefinition[];
 }
 
@@ -90,6 +91,9 @@ export function createServer(config: ServerConfig): McpServer {
     }
   }
 
+  // Tools published by plugins via mcp.yaml. Registers refresh_plugin_tools plus any
+  // already-loaded plugin tools passed in; otherwise the plugin tools arrive when
+  // loadPluginTools(server) runs, before the transport connects.
   registerPluginTools(server, client, ensureInitialized, {
     mode: config.pluginTools ?? 'all',
     initialTools: config.initialPluginTools,
