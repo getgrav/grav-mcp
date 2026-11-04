@@ -3,7 +3,11 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CORE_TOOL_GROUPS, createServer, type CoreToolsMode } from './server.js';
 import { GravApiError } from './client/error-mapper.js';
-import { loadPluginTools, type PluginToolsMode } from './tools/plugin-tools.js';
+import {
+  getPluginToolDefinitions,
+  loadPluginTools,
+  type PluginToolsMode,
+} from './tools/plugin-tools.js';
 
 interface CliConfig {
   url: string;
@@ -183,13 +187,14 @@ function describePluginToolsFailure(error: unknown): string {
 
 async function main(): Promise<void> {
   const config = parseArgs();
-  const server = createServer({
+  const serverConfig = {
     url: config.url,
     apiKey: config.apiKey,
     environment: config.environment,
     pluginTools: config.pluginTools,
     coreTools: config.coreTools,
-  });
+  };
+  const server = createServer(serverConfig);
 
   if (config.pluginTools !== 'none') {
     await loadPluginToolsAtStartup(server);
@@ -206,9 +211,39 @@ async function main(): Promise<void> {
     const http = await import('node:http');
 
     const httpServer = http.createServer(async (req, res) => {
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-      await server.connect(transport);
-      await transport.handleRequest(req, res);
+      try {
+        // The SDK requires an independent McpServer for each stateless HTTP request.
+        const requestServer = createServer({
+          ...serverConfig,
+          initialPluginTools: getPluginToolDefinitions(),
+        });
+        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+
+        res.once('close', () => {
+          void transport.close()
+            .finally(() => requestServer.close())
+            .catch((error) => {
+              console.error('Error closing MCP request resources:', error);
+            });
+        });
+
+        await requestServer.connect(transport);
+        await transport.handleRequest(req, res);
+      } catch (error) {
+        console.error('Error handling MCP request:', error);
+        if (res.destroyed) return;
+
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            jsonrpc: '2.0',
+            error: { code: -32603, message: 'Internal server error' },
+            id: null,
+          }));
+        } else if (!res.writableEnded) {
+          res.end();
+        }
+      }
     });
 
     httpServer.listen(config.port, () => {
